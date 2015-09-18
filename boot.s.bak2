@@ -1,0 +1,69 @@
+.code16
+.global _start, begtext, begdata, begbss, endtext, enddata, endbss
+.text
+begtext:
+.data
+begdata:
+.bss
+begbss:
+.text
+BOOTSEG = 0x07c0
+COPYSEG = 0x1000
+INITSEG = 0x2000
+SETUPLEN = 0x1 #8KB=16*512bytes
+_start:
+jmpl $BOOTSEG,$go
+go:
+movw %cs,%ax
+movw %ax,%ds
+movw %ax,%es
+load_setup: #load system into COPYSEG
+movw $0,%dx #驱动器0,磁头0;
+movw $2,%cx #扇区2,磁道0;
+movw $COPYSEG,%ax
+movw %ax,%es
+xor %bx,%bx #es:bx—>指向数据缓冲区
+movw $0x0200+SETUPLEN,%ax #!置为服务二，读入SETUPLEN个扇区;
+int $0x13 #中断13;
+jnc ok_load
+die: jmp die
+ok_load:
+#coty copyseg to initseg
+cli
+xor %si,%si
+xor %di,%di
+movw $COPYSEG,%ax
+movw %ax,%ds
+movw $INITSEG,%ax
+movw %ax,%es
+movw $512*(SETUPLEN),%cx
+cld
+rep movsb
+jmpl $INITSEG,$0
+movl %cr0,%ebx
+or $1,%ebx
+movl %ebx,%cr0
+sgdt gdt48
+movw $msg1,%bx
+movb %ah,17(%bx)
+movw $20,%cx
+movw $0x1004,%dx
+movw $0x000c,%bx
+movw $msg1,%bp
+movw $0x1301,%ax
+int $0x10
+loop1: jmp loop1
+msg1:
+.ascii "Loading system ..."
+.byte 13,10
+gdt48:
+.byte 0,0,0,0,0xff,0xff
+end:
+.org 510
+.word 0xAA55
+.text
+endtext:
+.data
+enddata:
+.bss
+endbss:
